@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VideoScribe AI - Transcrever & Resumir YouTube</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#faf5ff',
+              100: '#f3e8ff',
+              200: '#e9d5ff',
+              300: '#d8b4fe',
+              400: '#c084fc',
+              500: '#a855f7',
+              600: '#9333ea',
+              700: '#7e22ce',
+              800: '#6b21a8',
+              900: '#581c87',
+              950: '#3b0764',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
+
+  <!-- Navbar -->
+  <header class="border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="resetToHome()">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
+          <i data-lucide="scroll-text" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">VideoScribe</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30">AI</span>
+          </div>
+          <p class="text-[11px] text-zinc-400">Transcrever e Resumir Vídeos do YouTube</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-history-toggle" onclick="toggleHistoryDrawer()" class="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-medium flex items-center gap-2 transition">
+          <i data-lucide="history" class="w-4 h-4"></i>
+          <span>Histórico</span>
+        </button>
+
+        <button id="btn-settings-toggle" onclick="openSettingsModal()" class="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-medium flex items-center gap-2 transition">
+          <i data-lucide="key-round" class="w-4 h-4 text-brand-400"></i>
+          <span id="settings-status-label">API Key</span>
+          <span id="api-status-dot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col gap-6">
+
+    <!-- Top Input Card -->
+    <div id="input-section" class="bg-gradient-to-b from-zinc-900/90 to-zinc-900/50 border border-zinc-800/80 rounded-2xl p-5 md:p-7 shadow-2xl relative overflow-hidden transition-all duration-300">
+      <div class="absolute -top-24 -right-24 w-72 h-72 bg-brand-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="max-w-3xl mx-auto flex flex-col gap-4">
+        <div class="text-center md:text-left">
+          <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-white mb-1">
+            Transcreva e crie destaques instantâneos de vídeos
+          </h1>
+          <p class="text-sm text-zinc-400">
+            Cole um link do YouTube ou envie um arquivo de áudio/vídeo para gerar transcrição sincronizada, resumo executivo e chat interativo.
+          </p>
+        </div>
+
+        <!-- URL Input Form -->
+        <form id="transcribe-form" onsubmit="handleFormSubmit(event)" class="flex flex-col md:flex-row gap-2 mt-2">
+          <div class="relative flex-1">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+              <i data-lucide="youtube" class="w-5 h-5 text-red-500"></i>
+            </div>
+            <input 
+              type="text" 
+              id="youtube-url-input" 
+              placeholder="Cole o link do YouTube (ex: https://www.youtube.com/watch?v=...)" 
+              class="w-full pl-11 pr-24 py-3 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition shadow-inner"
+              required
+            >
+            <button 
+              type="button" 
+              onclick="pasteClipboard()" 
+              class="absolute inset-y-1.5 right-1.5 px-3 bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 hover:text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition"
+              title="Colar da área de transferência"
+            >
+              <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+              Colar
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select id="lang-select" class="bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs rounded-xl px-3 py-3 focus:outline-none focus:border-brand-500">
+              <option value="">Idioma: Automático</option>
+              <option value="pt" selected>Português (BR)</option>
+              <option value="en">Inglês (EN)</option>
+              <option value="es">Espanhol (ES)</option>
+            </select>
+
+            <button 
+              type="submit" 
+              id="btn-submit"
+              class="px-5 py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-brand-600/30 transition shrink-0 active:scale-95 disabled:opacity-50"
+            >
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Transcrever</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Secondary File Upload Toggle -->
+        <div class="flex items-center justify-between pt-1 border-t border-zinc-800/40 text-xs text-zinc-400">
+          <div class="flex items-center gap-2">
+            <span>Ou envie um arquivo do seu computador:</span>
+            <label class="cursor-pointer text-brand-400 hover:text-brand-300 font-semibold inline-flex items-center gap-1">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+              Escolher áudio/vídeo (.mp3, .wav, .mp4, etc.)
+              <input type="file" id="file-upload-input" accept="audio/*,video/*" class="hidden" onchange="handleFileUpload(event)">
+            </label>
+          </div>
+          <span class="text-[11px] text-zinc-500 hidden sm:inline">Suporta YouTube Shorts e vídeos de qualquer duração</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-card" class="hidden bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center shadow-xl flex-col items-center justify-center gap-4">
+      <div class="relative w-16 h-16">
+        <div class="w-16 h-16 rounded-full border-4 border-zinc-800 border-t-brand-500 animate-spin"></div>
+        <div class="absolute inset-0 flex items-center justify-center text-brand-400">
+          <i data-lucide="sparkles" class="w-6 h-6 animate-pulse"></i>
+        </div>
+      </div>
+      <div>
+        <h3 id="loading-title" class="text-lg font-bold text-white">Processando vídeo...</h3>
+        <p id="loading-subtitle" class="text-sm text-zinc-400 mt-1">Obtendo legendas e gerando destaques inteligentes com timestamps</p>
+      </div>
+    </div>
+
+    <!-- Error Alert Card -->
+    <div id="error-card" class="hidden bg-red-950/40 border border-red-800/60 rounded-xl p-4 flex items-start gap-3">
+      <i data-lucide="alert-circle" class="w-5 h-5 text-red-400 shrink-0 mt-0.5"></i>
+      <div class="flex-1">
+        <h4 class="text-sm font-bold text-red-300">Não foi possível transcrever</h4>
+        <p id="error-message" class="text-xs text-red-200/80 mt-0.5"></p>
+      </div>
+      <button onclick="hideError()" class="text-red-400 hover:text-red-200">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Workspace (Active Video Loaded) -->
+    <div id="workspace-section" class="hidden flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- LEFT COLUMN: Player & Metadata (5 cols on large screens) -->
+      <div class="lg:col-span-5 flex flex-col gap-4 sticky top-20">
+        <!-- Video Player Card -->
+        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-xl">
+          <!-- YouTube Video Container -->
+          <div id="youtube-player-container" class="aspect-video w-full bg-black relative">
+            <div id="yt-player"></div>
+          </div>
+
+          <!-- HTML5 Audio/Video Player for Uploaded Files -->
+          <div id="local-player-container" class="hidden p-4 bg-zinc-950 flex flex-col gap-3">
+            <audio id="local-audio-player" controls class="w-full"></audio>
+          </div>
+
+          <!-- Video Details -->
+          <div class="p-4 flex flex-col gap-2">
+            <h2 id="video-title" class="font-bold text-base md:text-lg text-white line-clamp-2 leading-snug">
+              Título do Vídeo
+            </h2>
+
+            <div class="flex items-center justify-between text-xs text-zinc-400 pt-1 border-t border-zinc-800">
+              <div class="flex items-center gap-2">
+                <i data-lucide="user" class="w-3.5 h-3.5 text-zinc-500"></i>
+                <span id="video-author" class="font-medium text-zinc-300">Canal</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span id="video-duration" class="font-mono bg-zinc-800/80 px-2 py-0.5 rounded text-[11px] text-zinc-300">00:00</span>
+                <a id="video-external-link" href="#" target="_blank" class="text-brand-400 hover:text-brand-300 flex items-center gap-1" title="Abrir no YouTube">
+                  <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Summary Stats Card -->
+        <div class="bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-4 flex items-center justify-around text-center text-xs">
+          <div>
+            <span class="text-zinc-500 block text-[10px] uppercase font-bold tracking-wider">Palavras</span>
+            <span id="stat-word-count" class="font-bold text-sm text-zinc-200">0</span>
+          </div>
+          <div class="w-px h-7 bg-zinc-800"></div>
+          <div>
+            <span class="text-zinc-500 block text-[10px] uppercase font-bold tracking-wider">Tempo de Leitura</span>
+            <span id="stat-read-time" class="font-bold text-sm text-zinc-200">0 min</span>
+          </div>
+          <div class="w-px h-7 bg-zinc-800"></div>
+          <div>
+            <span class="text-zinc-500 block text-[10px] uppercase font-bold tracking-wider">Falas / Trechos</span>
+            <span id="stat-segment-count" class="font-bold text-sm text-zinc-200">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Tabs, Highlights, Transcript, Chat (7 cols on large screens) -->
+      <div class="lg:col-span-7 bg-zinc-900 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-xl flex flex-col min-h-[640px]">
+        <!-- Tabs Header & Actions Bar -->
+        <div class="border-b border-zinc-800 bg-zinc-950/60 p-3 flex flex-wrap items-center justify-between gap-2">
+          <!-- Navigation Tabs -->
+          <nav class="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+            <button 
+              id="tab-btn-highlights" 
+              onclick="switchTab('highlights')" 
+              class="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition bg-brand-600 text-white shadow-sm"
+            >
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              Resumo & Destaques
+            </button>
+            <button 
+              id="tab-btn-transcript" 
+              onclick="switchTab('transcript')" 
+              class="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+            >
+              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+              Transcrição
+            </button>
+            <button 
+              id="tab-btn-chat" 
+              onclick="switchTab('chat')" 
+              class="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+            >
+              <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+              Chat com o Vídeo
+            </button>
+          </nav>
+
+          <!-- Export Actions -->
+          <div class="relative" id="export-dropdown-wrapper">
+            <button 
+              onclick="toggleExportMenu()" 
+              class="px-3 py-1.5 bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 text-zinc-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition"
+            >
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Exportar</span>
+              <i data-lucide="chevron-down" class="w-3 h-3 text-zinc-400"></i>
+            </button>
+
+            <!-- Export Menu Popup -->
+            <div id="export-menu" class="hidden absolute right-0 mt-1 w-52 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5 text-xs">
+              <button onclick="copyMarkdownToClipboard()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2">
+                <i data-lucide="copy" class="w-3.5 h-3.5 text-zinc-400"></i>
+                Copiar Markdown
+              </button>
+              <a id="btn-export-md" href="#" class="w-full text-left px-3 py-2 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2">
+                <i data-lucide="file-down" class="w-3.5 h-3.5 text-indigo-400"></i>
+                Baixar Markdown (.md)
+              </a>
+              <a id="btn-export-srt" href="#" class="w-full text-left px-3 py-2 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2">
+                <i data-lucide="subtitles" class="w-3.5 h-3.5 text-amber-400"></i>
+                Baixar Legendas (.srt)
+              </a>
+              <a id="btn-export-txt" href="#" class="w-full text-left px-3 py-2 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-zinc-400"></i>
+                Baixar Texto Puro (.txt)
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT 1: HIGHLIGHTS & SUMMARY -->
+        <div id="tab-content-highlights" class="p-6 flex flex-col gap-6 overflow-y-auto max-h-[720px]">
+          <!-- Key Takeaways Box -->
+          <div id="takeaways-box" class="bg-gradient-to-r from-brand-950/40 to-indigo-950/30 border border-brand-800/40 rounded-xl p-5">
+            <div class="flex items-center gap-2 text-brand-300 text-sm font-bold mb-3">
+              <i data-lucide="lightbulb" class="w-4 h-4 text-brand-400"></i>
+              Principais Aprendizados (Key Takeaways)
+            </div>
+            <ul id="takeaways-list" class="space-y-2 text-xs md:text-sm text-zinc-200">
+              <!-- Dynamically populated -->
+            </ul>
+          </div>
+
+          <!-- Chapters Timeline -->
+          <div id="chapters-box" class="flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="clock" class="w-4 h-4 text-zinc-400"></i>
+                Capítulos & Linha do Tempo
+              </h3>
+              <span class="text-[11px] text-zinc-500">Clique no minuto para pular o vídeo</span>
+            </div>
+            <div id="chapters-list" class="grid grid-cols-1 gap-2">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Full Rich Summary -->
+          <div class="flex flex-col gap-2 pt-4 border-t border-zinc-800">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="book-open" class="w-4 h-4 text-zinc-400"></i>
+              Resumo & Destaques Detalhados
+            </h3>
+            <div id="summary-content" class="prose-dark text-xs md:text-sm mt-1">
+              <!-- Markdown rendered content -->
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT 2: TRANSCRIPT -->
+        <div id="tab-content-transcript" class="hidden flex-1 flex-col overflow-hidden">
+          <!-- Search in Transcript Bar -->
+          <div class="p-3 border-b border-zinc-800 bg-zinc-950/40 flex items-center justify-between gap-3">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-3.5 h-3.5 absolute inset-y-0 left-3 my-auto text-zinc-500"></i>
+              <input 
+                type="text" 
+                id="transcript-search-input" 
+                placeholder="Pesquisar palavra na transcrição..." 
+                oninput="handleTranscriptSearch(event)"
+                class="w-full pl-9 pr-8 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-brand-500"
+              >
+              <button id="btn-clear-search" onclick="clearTranscriptSearch()" class="hidden absolute inset-y-0 right-2.5 my-auto text-zinc-400 hover:text-white">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+            <span id="search-matches-count" class="text-xs text-zinc-400 shrink-0 font-medium"></span>
+            <button onclick="copyRawTranscript()" class="px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition" title="Copiar todo o texto">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copiar</span>
+            </button>
+          </div>
+
+          <!-- Transcript Segments List -->
+          <div id="transcript-container" class="p-4 overflow-y-auto max-h-[660px] space-y-2">
+            <!-- Segments populated dynamically -->
+          </div>
+        </div>
+
+        <!-- TAB CONTENT 3: CHAT WITH VIDEO -->
+        <div id="tab-content-chat" class="hidden flex-1 flex-col overflow-hidden min-h-[500px]">
+          <!-- Chat Messages Area -->
+          <div id="chat-messages" class="flex-1 p-4 overflow-y-auto max-h-[520px] space-y-3">
+            <div class="p-4 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-xs text-zinc-300 flex flex-col gap-2">
+              <div class="flex items-center gap-2 text-brand-400 font-bold">
+                <i data-lucide="bot" class="w-4 h-4"></i>
+                Assistente de Vídeo AI
+              </div>
+              <p>Pergunte qualquer coisa sobre o conteúdo deste vídeo. As respostas incluem os minutos e segundos onde o assunto foi citado!</p>
+              
+              <!-- Prompt suggestions -->
+              <div class="flex flex-wrap gap-1.5 mt-2">
+                <button onclick="useQuickQuestion('Qual é a ideia principal apresentada no vídeo?')" class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-md text-[11px] text-zinc-300 hover:text-white transition">
+                  💡 Ideia principal
+                </button>
+                <button onclick="useQuickQuestion('Quais foram as principais conclusões e dicas dadas?')" class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-md text-[11px] text-zinc-300 hover:text-white transition">
+                  📌 Principais conclusões
+                </button>
+                <button onclick="useQuickQuestion('Houve alguma recomendação de ferramenta, método ou recurso?')" class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-md text-[11px] text-zinc-300 hover:text-white transition">
+                  🛠️ Recursos recomendados
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input Bar -->
+          <form onsubmit="handleChatSubmit(event)" class="p-3 border-t border-zinc-800 bg-zinc-950/60 flex items-center gap-2">
+            <input 
+              type="text" 
+              id="chat-input" 
+              placeholder="Faça uma pergunta sobre o vídeo..." 
+              class="flex-1 px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs md:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-brand-500"
+            >
+            <button 
+              type="submit" 
+              id="btn-chat-send"
+              class="p-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl transition disabled:opacity-50"
+            >
+              <i data-lucide="send" class="w-4 h-4"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- History Drawer / Slide-over -->
+  <div id="history-drawer" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="toggleHistoryDrawer()"></div>
+    <div class="absolute inset-y-0 right-0 max-w-sm w-full bg-zinc-900 border-l border-zinc-800 p-5 flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <h3 class="font-bold text-sm text-white flex items-center gap-2">
+          <i data-lucide="history" class="w-4 h-4 text-brand-400"></i>
+          Histórico de Vídeos
+        </h3>
+        <button onclick="toggleHistoryDrawer()" class="text-zinc-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div id="history-items-list" class="flex-1 overflow-y-auto py-3 space-y-2">
+        <!-- Dynamically filled -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeSettingsModal()"></div>
+    <div class="relative max-w-md w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+        <div class="flex items-center gap-2 text-white font-bold text-base">
+          <i data-lucide="key" class="w-4 h-4 text-brand-400"></i>
+          Configuração da IA (Gemini)
+        </div>
+        <button onclick="closeSettingsModal()" class="text-zinc-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-zinc-300 leading-relaxed">
+        Para gerar resumos com inteligência artificial de alta qualidade, tópicos automáticos e conversar com o vídeo, informe sua chave gratuita do Google Gemini.
+      </p>
+
+      <div class="bg-zinc-950 p-3 rounded-xl border border-zinc-800 text-[11px] text-zinc-400 flex flex-col gap-1.5">
+        <span class="font-semibold text-zinc-200">Como obter sua chave 100% gratuita:</span>
+        <ol class="list-decimal list-inside space-y-0.5 text-zinc-400">
+          <li>Acesse o <a href="https://aistudio.google.com/apikey" target="_blank" class="text-brand-400 hover:underline">Google AI Studio</a>.</li>
+          <li>Faça login com sua conta Google e clique em <strong>Create API Key</strong>.</li>
+          <li>Copie a chave e cole abaixo.</li>
+        </ol>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-zinc-300">Google Gemini API Key</label>
+        <input 
+          type="password" 
+          id="setting-api-key-input" 
+          placeholder="AIzaSy..." 
+          class="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-brand-500 font-mono"
+        >
+        <span id="setting-current-key-notice" class="text-[11px] text-zinc-500"></span>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition">
+          Cancelar
+        </button>
+        <button onclick="saveApiKeySetting()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition flex items-center gap-1.5">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          Salvar Chave
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="hidden fixed bottom-5 right-5 z-50 bg-zinc-900 border border-zinc-700 text-white text-xs px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 transition-all">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toast-message">Copiado com sucesso!</span>
+  </div>
+
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
