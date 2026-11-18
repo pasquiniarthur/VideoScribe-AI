@@ -556,61 +556,6 @@ async function loadChatMessages(historyId) {
   }
 }
 
-// Settings Modal & API Key Management
-async function checkApiKeyStatus() {
-  try {
-    const res = await fetch("/api/settings");
-    const data = await res.json();
-    const dot = document.getElementById("api-status-dot");
-    const label = document.getElementById("settings-status-label");
-    const notice = document.getElementById("setting-current-key-notice");
-
-    if (data.has_gemini_key) {
-      dot.className = "w-2 h-2 rounded-full bg-emerald-500";
-      label.textContent = "IA Ativa";
-      notice.textContent = `Chave configurada: ${data.masked_key}`;
-    } else {
-      dot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
-      label.textContent = "Configurar IA";
-      notice.textContent = "Nenhuma chave configurada ainda (opcional para IA).";
-    }
-  } catch (err) {
-    console.error("Error fetching settings:", err);
-  }
-}
-
-function openSettingsModal() {
-  document.getElementById("settings-modal").classList.remove("hidden");
-  document.getElementById("setting-api-key-input").focus();
-}
-
-function closeSettingsModal() {
-  document.getElementById("settings-modal").classList.add("hidden");
-}
-
-async function saveApiKeySetting() {
-  const key = document.getElementById("setting-api-key-input").value.trim();
-  if (!key) {
-    showToast("Por favor, cole a chave de API.");
-    return;
-  }
-
-  try {
-    const res = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gemini_api_key: key })
-    });
-    if (res.ok) {
-      showToast("Chave salva com sucesso!");
-      closeSettingsModal();
-      checkApiKeyStatus();
-    }
-  } catch (err) {
-    showToast("Erro ao salvar chave.");
-  }
-}
-
 // History Drawer & List Management
 function toggleHistoryDrawer() {
   const drawer = document.getElementById("history-drawer");
@@ -722,6 +667,5 @@ function hideError() {
 
 // Init on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
-  checkApiKeyStatus();
   lucide.createIcons();
 });

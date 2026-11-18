@@ -113,7 +113,7 @@ Retorne APENAS o JSON válido, sem cercas de código Markdown desnecessárias fo
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -183,7 +183,7 @@ Instruções:
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.4
@@ -238,7 +238,7 @@ Retorne APENAS o JSON válido.
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=[
                 types.Part(
                     file_data=types.FileData(
