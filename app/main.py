@@ -91,19 +91,25 @@ def process_youtube(req: YoutubeRequest):
             }
             
     # 1. Fetch metadata
+    print(f"[PROCESS] Iniciando requisição para vídeo: {video_id}", flush=True)
     meta = get_video_metadata(video_id)
+    print(f"[PROCESS] Metadados obtidos: '{meta['title']}' ({meta.get('duration_str')})", flush=True)
     
     # 2. Fetch transcript (Try YouTube transcript first, fallback to Gemini Direct if blocked)
     transcript_data = None
     highlights = None
     
     try:
+        print("[PROCESS] Tentando obter transcrição oficial do YouTube...", flush=True)
         transcript_data = get_transcript(video_id, preferred_lang=req.language)
+        print(f"[PROCESS] Sucesso na transcrição oficial: {len(transcript_data['segments'])} trechos.", flush=True)
     except Exception as yt_err:
+        print(f"[PROCESS] YouTube oficial bloqueado ({yt_err}). Acionando Gemini direto...", flush=True)
         has_gemini = bool(get_setting("GEMINI_API_KEY"))
         if has_gemini:
             try:
                 gemini_result = transcribe_youtube_with_gemini(video_id, meta["title"], meta["author"])
+                print("[PROCESS] Sucesso no processamento via Gemini!", flush=True)
                 transcript_data = {
                     "language": gemini_result.get("language", "pt"),
                     "segments": gemini_result.get("segments", []),
@@ -116,6 +122,7 @@ def process_youtube(req: YoutubeRequest):
                     "is_ai_generated": True
                 }
             except Exception as g_err:
+                print(f"[PROCESS] Erro no Gemini fallback: {g_err}", flush=True)
                 raise HTTPException(
                     status_code=422,
                     detail=f"O YouTube bloqueou a leitura direta e o processamento de fallback falhou: {str(g_err)}"

@@ -20,7 +20,6 @@ FALLBACK_MODELS = [
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
-    "gemini-3.8-flash",
 ]
 
 def generate_content_with_fallback(client, contents, config=None):
@@ -232,7 +231,7 @@ def transcribe_youtube_with_gemini(video_id: str, title: str, author: str, api_k
         
     yt_url = f"https://www.youtube.com/watch?v={video_id}"
     
-    prompt = f"""Você é o VideoScribe AI. Analise o vídeo do YouTube a seguir ({title} por {author}) e transcreva os momentos e falas com timestamps fiéis, além de gerar os tópicos e resumo executivo.
+    prompt = f"""Você é o VideoScribe AI. Analise este vídeo do YouTube ({title} por {author}) e gere a síntese estruturada e a transcrição dos momentos principais com timestamps precisos no formato [MM:SS] ou [HH:MM:SS].
 
 Responda EXCLUSIVAMENTE em formato JSON com a seguinte estrutura:
 {{
@@ -251,15 +250,16 @@ Responda EXCLUSIVAMENTE em formato JSON com a seguinte estrutura:
       "summary": "Resumo do que é abordado neste trecho"
     }}
   ],
-  "summary_markdown": "Resumo detalhado com tópicos abordados e momentos chave citados como [MM:SS].",
+  "summary_markdown": "Resumo analítico detalhado do vídeo em Markdown, citando momentos chave no formato [MM:SS].",
   "segments": [
     {{
       "start": 0.0,
       "timestamp": "00:00",
-      "text": "Primeiro trecho falado..."
+      "text": "Fala e conteúdo deste momento do vídeo..."
     }}
   ]
 }}
+Divida em 15 a 30 blocos cronológicos representativos cobrindo do início ao fim do vídeo.
 Retorne APENAS o JSON válido.
 """
 
@@ -267,10 +267,9 @@ Retorne APENAS o JSON válido.
         response = generate_content_with_fallback(
             client=client,
             contents=[
-                types.Part(
-                    file_data=types.FileData(
-                        file_uri=yt_url
-                    )
+                types.Part.from_uri(
+                    file_uri=yt_url,
+                    mime_type="video/*"
                 ),
                 prompt
             ],

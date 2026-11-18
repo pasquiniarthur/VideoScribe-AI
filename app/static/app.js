@@ -643,14 +643,34 @@ function resetToHome() {
 }
 
 // UI State helpers
+let loadingInterval = null;
+
 function showLoading(title, subtitle) {
   document.getElementById("loading-title").textContent = title;
   document.getElementById("loading-subtitle").textContent = subtitle;
   document.getElementById("loading-card").classList.remove("hidden");
   document.getElementById("loading-card").classList.add("flex");
+  document.getElementById("loading-card").scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  const messages = [
+    { title: "Processando vídeo com a IA...", sub: "Analisando o áudio e a estrutura do conteúdo..." },
+    { title: "Identificando tópicos e timestamps...", sub: "Mapeando os momentos mais importantes da fala..." },
+    { title: "Criando resumo executivo...", sub: "Quase pronto! Organizando as anotações e aprendizados chave..." }
+  ];
+
+  let step = 0;
+  if (loadingInterval) clearInterval(loadingInterval);
+  loadingInterval = setInterval(() => {
+    if (step < messages.length) {
+      document.getElementById("loading-title").textContent = messages[step].title;
+      document.getElementById("loading-subtitle").textContent = messages[step].sub;
+      step++;
+    }
+  }, 6000);
 }
 
 function hideLoading() {
+  if (loadingInterval) clearInterval(loadingInterval);
   document.getElementById("loading-card").classList.add("hidden");
   document.getElementById("loading-card").classList.remove("flex");
 }
