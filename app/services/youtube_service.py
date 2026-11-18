@@ -57,6 +57,7 @@ def get_video_metadata(video_id: str) -> Dict[str, Any]:
         "thumbnail": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
     }
     
+    is_oembed_404 = False
     # Fast oEmbed check
     try:
         oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
@@ -67,10 +68,13 @@ def get_video_metadata(video_id: str) -> Dict[str, Any]:
             meta["author"] = data.get("author_name", meta["author"])
             if data.get("thumbnail_url"):
                 meta["thumbnail"] = data.get("thumbnail_url")
+        elif res.status_code in (404, 401, 403):
+            is_oembed_404 = True
     except Exception:
         pass
 
     # Detailed extraction via yt-dlp (flat)
+    ytdl_unavailable = False
     try:
         ydl_opts = {
             "extract_flat": True,
@@ -88,8 +92,13 @@ def get_video_metadata(video_id: str) -> Dict[str, Any]:
                 if info.get("thumbnail"):
                     meta["thumbnail"] = info.get("thumbnail")
     except Exception as e:
-        # If yt-dlp fails (e.g. strict rate limit), oEmbed already gave title & author
+        err_msg = str(e).lower()
+        if "unavailable" in err_msg or "not found" in err_msg or "private" in err_msg:
+            ytdl_unavailable = True
         print(f"Warning: yt-dlp metadata failed: {e}")
+
+    if is_oembed_404 and ytdl_unavailable:
+        meta["is_unavailable"] = True
         
     return meta
 

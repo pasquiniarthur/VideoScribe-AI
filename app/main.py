@@ -95,6 +95,12 @@ def process_youtube(req: YoutubeRequest):
     meta = get_video_metadata(video_id)
     print(f"[PROCESS] Metadados obtidos: '{meta['title']}' ({meta.get('duration_str')})", flush=True)
     
+    if meta.get("is_unavailable"):
+        raise HTTPException(
+            status_code=400,
+            detail="Este vídeo está indisponível, foi excluído ou está configurado como privado no YouTube. Por favor, teste com um vídeo público ativo."
+        )
+    
     # 2. Fetch transcript (Try YouTube transcript first, fallback to Gemini Direct if blocked)
     transcript_data = None
     highlights = None
@@ -123,9 +129,15 @@ def process_youtube(req: YoutubeRequest):
                 }
             except Exception as g_err:
                 print(f"[PROCESS] Erro no Gemini fallback: {g_err}", flush=True)
+                err_str = str(g_err)
+                if "404" in err_str or "NOT_FOUND" in err_str or "unavailable" in err_str.lower():
+                    raise HTTPException(
+                        status_code=400,
+                        detail="O vídeo informado não foi encontrado ou está inacessível no YouTube. Verifique se o link está correto e se o vídeo é público."
+                    )
                 raise HTTPException(
                     status_code=422,
-                    detail=f"O YouTube bloqueou a leitura direta e o processamento de fallback falhou: {str(g_err)}"
+                    detail=f"Não foi possível processar o vídeo: {err_str}"
                 )
         else:
             raise HTTPException(
