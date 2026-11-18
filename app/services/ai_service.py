@@ -16,6 +16,33 @@ def get_gemini_client(api_key: Optional[str] = None) -> Optional[genai.Client]:
         print(f"Error initializing Gemini client: {e}")
         return None
 
+FALLBACK_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-3.8-flash",
+]
+
+def generate_content_with_fallback(client, contents, config=None):
+    """Try models sequentially to protect against temporary 503 high demand spikes."""
+    last_err = None
+    for model_name in FALLBACK_MODELS:
+        try:
+            return client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=config
+            )
+        except Exception as e:
+            err_str = str(e)
+            print(f"Model {model_name} warning: {err_str}, trying fallback...")
+            last_err = e
+            if "503" in err_str or "404" in err_str or "high demand" in err_str.lower() or "UNAVAILABLE" in err_str:
+                continue
+            if "API_KEY_INVALID" in err_str or "403" in err_str:
+                raise e
+    raise last_err
+
 def heuristic_summary(transcript_data: Dict[str, Any], title: str) -> Dict[str, Any]:
     """Fallback smart summary when no API key is provided."""
     paragraphs = transcript_data.get("paragraphs", [])
@@ -112,8 +139,8 @@ Retorne APENAS o JSON válido, sem cercas de código Markdown desnecessárias fo
 """
 
     try:
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
+        response = generate_content_with_fallback(
+            client=client,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -182,8 +209,8 @@ Instruções:
 """
 
     try:
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
+        response = generate_content_with_fallback(
+            client=client,
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.4
@@ -237,8 +264,8 @@ Retorne APENAS o JSON válido.
 """
 
     try:
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
+        response = generate_content_with_fallback(
+            client=client,
             contents=[
                 types.Part(
                     file_data=types.FileData(

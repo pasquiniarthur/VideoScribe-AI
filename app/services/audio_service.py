@@ -4,7 +4,7 @@ import json
 import re
 from typing import Dict, Any, List
 from app.services.youtube_service import format_timestamp, group_transcript_into_paragraphs
-from app.services.ai_service import get_gemini_client
+from app.services.ai_service import get_gemini_client, generate_content_with_fallback
 
 def convert_to_audio(input_path: str, output_path: str) -> bool:
     """Extract audio from video or convert audio to lightweight MP3 using ffmpeg."""
@@ -67,8 +67,8 @@ Retorne APENAS o JSON válido.
 """
 
     try:
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
+        response = generate_content_with_fallback(
+            client=client,
             contents=[uploaded_file, prompt]
         )
         
