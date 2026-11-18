@@ -192,3 +192,93 @@ Instruções:
         return response.text.strip()
     except Exception as e:
         return f"Erro ao consultar a IA: {str(e)}"
+
+def transcribe_youtube_with_gemini(video_id: str, title: str, author: str, api_key: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Direct Gemini Multimodal Video processing for YouTube URLs.
+    Bypasses YouTube cloud datacenter IP blocks completely by letting Google process the video directly!
+    """
+    from app.services.youtube_service import format_timestamp, group_transcript_into_paragraphs
+    client = get_gemini_client(api_key)
+    if not client:
+        raise ValueError("Chave de API do Google Gemini não configurada.")
+        
+    yt_url = f"https://www.youtube.com/watch?v={video_id}"
+    
+    prompt = f"""Você é o VideoScribe AI. Analise o vídeo do YouTube a seguir ({title} por {author}) e transcreva os momentos e falas com timestamps fiéis, além de gerar os tópicos e resumo executivo.
+
+Responda EXCLUSIVAMENTE em formato JSON com a seguinte estrutura:
+{{
+  "language": "pt",
+  "takeaways": [
+    "Insight ou aprendizado chave 1",
+    "Insight ou aprendizado chave 2",
+    "Insight ou aprendizado chave 3",
+    "Insight ou aprendizado chave 4"
+  ],
+  "chapters": [
+    {{
+      "timestamp": "00:00",
+      "seconds": 0,
+      "title": "Título conciso da seção",
+      "summary": "Resumo do que é abordado neste trecho"
+    }}
+  ],
+  "summary_markdown": "Resumo detalhado com tópicos abordados e momentos chave citados como [MM:SS].",
+  "segments": [
+    {{
+      "start": 0.0,
+      "timestamp": "00:00",
+      "text": "Primeiro trecho falado..."
+    }}
+  ]
+}}
+Retorne APENAS o JSON válido.
+"""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                types.Part(
+                    file_data=types.FileData(
+                        file_uri=yt_url
+                    )
+                ),
+                prompt
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.3
+            )
+        )
+        
+        raw_text = response.text.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?", "", raw_text)
+            raw_text = re.sub(r"```$", "", raw_text).strip()
+            
+        data = json.loads(raw_text)
+        segments = data.get("segments", [])
+        
+        for i, s in enumerate(segments):
+            start = float(s.get("start", 0.0))
+            s["start"] = start
+            s["timestamp"] = s.get("timestamp") or format_timestamp(start)
+            next_start = float(segments[i+1].get("start", start + 5.0)) if i + 1 < len(segments) else start + 5.0
+            s["duration"] = round(max(1.0, next_start - start), 2)
+            
+        paragraphs = group_transcript_into_paragraphs(segments)
+        
+        return {
+            "language": data.get("language", "pt"),
+            "segments": segments,
+            "paragraphs": paragraphs,
+            "summary_markdown": data.get("summary_markdown", ""),
+            "takeaways": data.get("takeaways", []),
+            "chapters": data.get("chapters", []),
+            "is_ai_generated": True
+        }
+    except Exception as e:
+        raise RuntimeError(f"Falha ao processar vídeo via Gemini: {str(e)}")
+

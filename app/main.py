@@ -14,7 +14,7 @@ from app.database import (
     save_chat_message, get_chat_history
 )
 from app.services.youtube_service import extract_video_id, get_video_metadata, get_transcript
-from app.services.ai_service import generate_video_highlights, answer_video_chat
+from app.services.ai_service import generate_video_highlights, answer_video_chat, transcribe_youtube_with_gemini
 from app.services.audio_service import convert_to_audio, transcribe_audio_file
 from app.services.export_service import export_to_markdown, export_to_srt, export_to_vtt, export_to_txt
 
@@ -93,22 +93,48 @@ def process_youtube(req: YoutubeRequest):
     # 1. Fetch metadata
     meta = get_video_metadata(video_id)
     
-    # 2. Fetch transcript
+    # 2. Fetch transcript (Try YouTube transcript first, fallback to Gemini Direct if blocked)
+    transcript_data = None
+    highlights = None
+    
     try:
         transcript_data = get_transcript(video_id, preferred_lang=req.language)
-    except Exception as e:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Não foi possível obter a transcrição do YouTube: {str(e)}. "
-                   f"Dica: Vídeos precisam ter legendas (automáticas ou manuais) habilitadas."
-        )
+    except Exception as yt_err:
+        has_gemini = bool(get_setting("GEMINI_API_KEY"))
+        if has_gemini:
+            try:
+                gemini_result = transcribe_youtube_with_gemini(video_id, meta["title"], meta["author"])
+                transcript_data = {
+                    "language": gemini_result.get("language", "pt"),
+                    "segments": gemini_result.get("segments", []),
+                    "paragraphs": gemini_result.get("paragraphs", []),
+                }
+                highlights = {
+                    "summary_markdown": gemini_result.get("summary_markdown", ""),
+                    "takeaways": gemini_result.get("takeaways", []),
+                    "chapters": gemini_result.get("chapters", []),
+                    "is_ai_generated": True
+                }
+            except Exception as g_err:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"O YouTube bloqueou a leitura direta e o processamento de fallback falhou: {str(g_err)}"
+                )
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail="O YouTube bloqueou a leitura de legendas deste servidor na nuvem (bloqueio de IP padrão do YouTube para servidores como Render/AWS). "
+                       "Para resolver isso, configure sua chave gratuita do Google Gemini no botão 'Configurar IA' no topo da página "
+                       "(ou defina a variável GEMINI_API_KEY no painel do Render) para que o Google processe o vídeo diretamente sem bloqueio de IP!"
+            )
         
-    # 3. Generate Highlights and Summary
-    highlights = generate_video_highlights(
-        transcript_data=transcript_data,
-        title=meta["title"],
-        author=meta["author"]
-    )
+    # 3. Generate Highlights and Summary (if not already done via Gemini fallback)
+    if not highlights:
+        highlights = generate_video_highlights(
+            transcript_data=transcript_data,
+            title=meta["title"],
+            author=meta["author"]
+        )
     
     item = {
         "id": history_id,
